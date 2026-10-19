@@ -1,3 +1,4 @@
+
 name: EnigMano Instance Deployment
 
 on:
@@ -21,9 +22,9 @@ jobs:
     - name: System Information
       run: |
         Write-Host "=== ENIGMANO RDP DEPLOYMENT ===" -ForegroundColor Green
-        Write-Host "Instance Number: \${{ github.event.inputs.instance_number }}" -ForegroundColor Yellow
-        Write-Host "Runner: \$env:RUNNER_NAME" -ForegroundColor Yellow
-        Write-Host "Workflow: \$env:GITHUB_WORKFLOW" -ForegroundColor Yellow
+        Write-Host "Instance Number: ${{ github.event.inputs.instance_number }}" -ForegroundColor Yellow
+        Write-Host "Runner: $env:RUNNER_NAME" -ForegroundColor Yellow
+        Write-Host "Workflow: $env:GITHUB_WORKFLOW" -ForegroundColor Yellow
         
         # System specs
         Write-Host "`n=== SYSTEM SPECIFICATIONS ===" -ForegroundColor Cyan
@@ -61,21 +62,18 @@ jobs:
       run: |
         Write-Host "Installing essential software..." -ForegroundColor Green
         
-        # Safe Chocolatey Installation using native PowerShell downloading
+        # Install Chocolatey
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         
-        Write-Host "Downloading Chocolatey installer..." -ForegroundColor Cyan
-        Invoke-WebRequest -Uri 'https://chocolatey.org' -OutFile 'install.ps1'
-        & .\install.ps1
-        
-        # Refresh environment variables so choco command becomes active instantly
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-        
-        # Install Applications
-        Write-Host "Installing tools via choco..." -ForegroundColor Cyan
+        # Install Chrome
         choco install googlechrome -y
+        
+        # Install 7-Zip
         choco install 7zip -y
+        
+        # Install Notepad++
         choco install notepadplusplus -y
         
         Write-Host "Software installation completed!" -ForegroundColor Green
@@ -88,14 +86,9 @@ jobs:
       run: |
         Write-Host "Setting up Cloudflare WARP..." -ForegroundColor Green
         try {
-          Invoke-WebRequest -Uri "https://cloudflareclient.com" -OutFile "CloudflareWARP.msi"
+          Invoke-WebRequest -Uri "https://1111-releases.cloudflareclient.com/windows/Cloudflare_WARP_Release-x64.msi" -OutFile "CloudflareWARP.msi"
           Start-Process msiexec.exe -Wait -ArgumentList '/I CloudflareWARP.msi /quiet'
-          
-          # Force WARP daemon to disconnect to prevent it from blocking outbound ngrok traffic
-          if (Test-Path "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe") {
-            & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" disconnect
-            Write-Host "Cloudflare WARP disconnected successfully to allow tunneling!" -ForegroundColor Green
-          }
+          Write-Host "Cloudflare WARP installed successfully!" -ForegroundColor Green
         } catch {
           Write-Host "Cloudflare WARP installation failed, continuing..." -ForegroundColor Yellow
         }
@@ -103,21 +96,21 @@ jobs:
     - name: Start ngrok Tunnel
       run: |
         Write-Host "Starting ngrok tunnel..." -ForegroundColor Green
-        Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region us" -WindowStyle Hidden
+        Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
         Start-Sleep -Seconds 15
         
     - name: Get Connection Details
       run: |
         Write-Host "`n=== CONNECTION DETAILS ===" -ForegroundColor Green
         try {
-          \$ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
-          publicUrl = ngrokApi.tunnels[0].public_url
-          hostAddress = publicUrl -replace "tcp://", ""
+          $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
+          $publicUrl = $ngrokApi.tunnels[0].public_url
+          $host = $publicUrl -replace "tcp://", ""
           
           Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Cyan
           Write-Host "║         ENIGMANO RDP ACCESS          ║" -ForegroundColor Cyan  
           Write-Host "╠══════════════════════════════════════╣" -ForegroundColor Cyan
-          Write-Host "║ Host: \$hostAddress" -ForegroundColor White
+          Write-Host "║ Host: $host" -ForegroundColor White
           Write-Host "║ Username: runneradmin                ║" -ForegroundColor White
           Write-Host "║ Password: P@ssw0rd!                  ║" -ForegroundColor White
           Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Cyan
@@ -147,21 +140,23 @@ jobs:
         Write-Host "Instance will remain active for up to 6 hours." -ForegroundColor Yellow
         Write-Host "Do not close this window to maintain the connection." -ForegroundColor Red
         
-        \$counter = 0
-        while (\(true) {\)counter++
-          Write-Host "Session active - Heartbeat #counter ((Get-Date))" -ForegroundColor Green
+        # Keep the session alive
+        $counter = 0
+        while ($true) {
+          $counter++
+          Write-Host "Session active - Heartbeat #$counter ($(Get-Date))" -ForegroundColor Green
           
           # Check if ngrok is still running
           try {
-            \$ngrokStatus = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -TimeoutSec 5
-            if (\$ngrokStatus.tunnels.Count -gt 0) {
+            $ngrokStatus = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -TimeoutSec 5
+            if ($ngrokStatus.tunnels.Count -gt 0) {
               Write-Host "ngrok tunnel status: ACTIVE" -ForegroundColor Green
             } else {
               Write-Host "ngrok tunnel status: NO TUNNELS" -ForegroundColor Yellow
             }
           } catch {
             Write-Host "ngrok tunnel status: ERROR - Restarting..." -ForegroundColor Red
-            Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region us" -WindowStyle Hidden
+            Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
           }
           
           Start-Sleep -Seconds 60
