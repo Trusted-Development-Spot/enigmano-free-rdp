@@ -1,4 +1,3 @@
-
 name: EnigMano Instance Deployment
 
 on:
@@ -22,9 +21,9 @@ jobs:
     - name: System Information
       run: |
         Write-Host "=== ENIGMANO RDP DEPLOYMENT ===" -ForegroundColor Green
-        Write-Host "Instance Number: ${{ github.event.inputs.instance_number }}" -ForegroundColor Yellow
-        Write-Host "Runner: $env:RUNNER_NAME" -ForegroundColor Yellow
-        Write-Host "Workflow: $env:GITHUB_WORKFLOW" -ForegroundColor Yellow
+        Write-Host "Instance Number: \${{ github.event.inputs.instance_number }}" -ForegroundColor Yellow
+        Write-Host "Runner: \$env:RUNNER_NAME" -ForegroundColor Yellow
+        Write-Host "Workflow: \$env:GITHUB_WORKFLOW" -ForegroundColor Yellow
         
         # System specs
         Write-Host "`n=== SYSTEM SPECIFICATIONS ===" -ForegroundColor Cyan
@@ -65,7 +64,7 @@ jobs:
         # Install Chocolatey
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org'))
         
         # Install Chrome
         choco install googlechrome -y
@@ -86,9 +85,14 @@ jobs:
       run: |
         Write-Host "Setting up Cloudflare WARP..." -ForegroundColor Green
         try {
-          Invoke-WebRequest -Uri "https://1111-releases.cloudflareclient.com/windows/Cloudflare_WARP_Release-x64.msi" -OutFile "CloudflareWARP.msi"
+          Invoke-WebRequest -Uri "https://cloudflareclient.com" -OutFile "CloudflareWARP.msi"
           Start-Process msiexec.exe -Wait -ArgumentList '/I CloudflareWARP.msi /quiet'
-          Write-Host "Cloudflare WARP installed successfully!" -ForegroundColor Green
+          
+          # Force WARP daemon to disconnect to prevent it from blocking outbound ngrok traffic
+          if (Test-Path "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe") {
+            & "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe" disconnect
+            Write-Host "Cloudflare WARP disconnected successfully to allow tunneling!" -ForegroundColor Green
+          }
         } catch {
           Write-Host "Cloudflare WARP installation failed, continuing..." -ForegroundColor Yellow
         }
@@ -96,21 +100,22 @@ jobs:
     - name: Start ngrok Tunnel
       run: |
         Write-Host "Starting ngrok tunnel..." -ForegroundColor Green
-        Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
+        # Added explicit US routing region to prevent connection configuration drops
+        Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region us" -WindowStyle Hidden
         Start-Sleep -Seconds 15
         
     - name: Get Connection Details
       run: |
         Write-Host "`n=== CONNECTION DETAILS ===" -ForegroundColor Green
         try {
-          $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
-          $publicUrl = $ngrokApi.tunnels[0].public_url
-          $host = $publicUrl -replace "tcp://", ""
+          \$ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
+          publicUrl = ngrokApi.tunnels[0].public_url
+          host = publicUrl -replace "tcp://", ""
           
           Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Cyan
           Write-Host "║         ENIGMANO RDP ACCESS          ║" -ForegroundColor Cyan  
           Write-Host "╠══════════════════════════════════════╣" -ForegroundColor Cyan
-          Write-Host "║ Host: $host" -ForegroundColor White
+          Write-Host "║ Host: \$host" -ForegroundColor White
           Write-Host "║ Username: runneradmin                ║" -ForegroundColor White
           Write-Host "║ Password: P@ssw0rd!                  ║" -ForegroundColor White
           Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Cyan
@@ -141,22 +146,22 @@ jobs:
         Write-Host "Do not close this window to maintain the connection." -ForegroundColor Red
         
         # Keep the session alive
-        $counter = 0
-        while ($true) {
-          $counter++
-          Write-Host "Session active - Heartbeat #$counter ($(Get-Date))" -ForegroundColor Green
+        \$counter = 0
+        while (\(true) {\)counter++
+          Write-Host "Session active - Heartbeat #counter ((Get-Date))" -ForegroundColor Green
           
           # Check if ngrok is still running
           try {
-            $ngrokStatus = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -TimeoutSec 5
-            if ($ngrokStatus.tunnels.Count -gt 0) {
+            \$ngrokStatus = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -TimeoutSec 5
+            if (\$ngrokStatus.tunnels.Count -gt 0) {
               Write-Host "ngrok tunnel status: ACTIVE" -ForegroundColor Green
             } else {
               Write-Host "ngrok tunnel status: NO TUNNELS" -ForegroundColor Yellow
             }
           } catch {
             Write-Host "ngrok tunnel status: ERROR - Restarting..." -ForegroundColor Red
-            Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
+            # Fixed arguments here to include region flag during recovery restart
+            Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region us" -WindowStyle Hidden
           }
           
           Start-Sleep -Seconds 60
