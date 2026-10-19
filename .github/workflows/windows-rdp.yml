@@ -61,18 +61,21 @@ jobs:
       run: |
         Write-Host "Installing essential software..." -ForegroundColor Green
         
-        # Install Chocolatey
+        # Safe Chocolatey Installation using native PowerShell downloading
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org'))
         
-        # Install Chrome
+        Write-Host "Downloading Chocolatey installer..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri 'https://chocolatey.org' -OutFile 'install.ps1'
+        & .\install.ps1
+        
+        # Refresh environment variables so choco command becomes active instantly
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        # Install Applications
+        Write-Host "Installing tools via choco..." -ForegroundColor Cyan
         choco install googlechrome -y
-        
-        # Install 7-Zip
         choco install 7zip -y
-        
-        # Install Notepad++
         choco install notepadplusplus -y
         
         Write-Host "Software installation completed!" -ForegroundColor Green
@@ -100,7 +103,6 @@ jobs:
     - name: Start ngrok Tunnel
       run: |
         Write-Host "Starting ngrok tunnel..." -ForegroundColor Green
-        # Added explicit US routing region to prevent connection configuration drops
         Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region us" -WindowStyle Hidden
         Start-Sleep -Seconds 15
         
@@ -110,12 +112,12 @@ jobs:
         try {
           \$ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
           publicUrl = ngrokApi.tunnels[0].public_url
-          host = publicUrl -replace "tcp://", ""
+          hostAddress = publicUrl -replace "tcp://", ""
           
           Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Cyan
           Write-Host "║         ENIGMANO RDP ACCESS          ║" -ForegroundColor Cyan  
           Write-Host "╠══════════════════════════════════════╣" -ForegroundColor Cyan
-          Write-Host "║ Host: \$host" -ForegroundColor White
+          Write-Host "║ Host: \$hostAddress" -ForegroundColor White
           Write-Host "║ Username: runneradmin                ║" -ForegroundColor White
           Write-Host "║ Password: P@ssw0rd!                  ║" -ForegroundColor White
           Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Cyan
@@ -145,7 +147,6 @@ jobs:
         Write-Host "Instance will remain active for up to 6 hours." -ForegroundColor Yellow
         Write-Host "Do not close this window to maintain the connection." -ForegroundColor Red
         
-        # Keep the session alive
         \$counter = 0
         while (\(true) {\)counter++
           Write-Host "Session active - Heartbeat #counter ((Get-Date))" -ForegroundColor Green
@@ -160,7 +161,6 @@ jobs:
             }
           } catch {
             Write-Host "ngrok tunnel status: ERROR - Restarting..." -ForegroundColor Red
-            # Fixed arguments here to include region flag during recovery restart
             Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region us" -WindowStyle Hidden
           }
           
