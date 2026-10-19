@@ -1,0 +1,19 @@
+name: Debug EnigMano Live
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ssh-debug:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    # Yeh action apko runner ka live link terminal par dega
+    - name: Setup Tmate SSH Session
+      uses: mxschmitt/action-tmate@v3
+      timeout-minutes: 60
+      with:
+        limit-access-to-actor: false
