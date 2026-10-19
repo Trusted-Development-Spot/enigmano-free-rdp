@@ -96,7 +96,7 @@ jobs:
     - name: Start ngrok Tunnel
       run: |
         Write-Host "Starting ngrok tunnel..." -ForegroundColor Green
-        Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --authtoken ${{ secrets.NGROK_SHAHZAIB }}" -WindowStyle Hidden
+        Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
         Start-Sleep -Seconds 15
         
     - name: Get Connection Details
