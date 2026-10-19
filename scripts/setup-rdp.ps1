@@ -3,7 +3,7 @@
 # This script configures Windows for RDP access with security enhancements
 
 param(
-    [string]$NgrokToken = $env:NGROK_AUTH_TOKEN,
+    [string]$NgrokToken = $env:NGROK_SHAHZAIB,
     [string]$Username = "runneradmin",
     [string]$Password = "P@ssw0rd!"
 )
